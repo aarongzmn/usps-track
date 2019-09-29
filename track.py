@@ -2,7 +2,7 @@ import pandas as pd
 import requests
 from xml.etree import ElementTree
 from tqdm import tqdm
-import configparser
+import os
 
 
 def no(track):
@@ -12,9 +12,7 @@ def no(track):
     return(r)
 
 #read in USPS API username from usps_auth.ini file
-config = configparser.ConfigParser()
-config.read('usps_auth.ini')
-usps_username = config['DEFAULT']['uspsauth']
+usps_username = os.environ.get('USPS_USERID')
 
 #read in list of tracking numbers to be processed
 data = pd.read_csv('sample_mix.csv')
