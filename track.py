@@ -2,16 +2,21 @@ import pandas as pd
 import requests
 from xml.etree import ElementTree
 from tqdm import tqdm
+import urllib.parse
 import os
 
 
 def no(track):
-    usps = (
-        "http://production.shippingapis.com/ShippingAPI.dll?API=TrackV2&XML=%3CTrackFieldRequest%20USERID=%22"
-        + usps_username
-        + "%22%3E%3CClientIp%3E111.0.0.1%3C/ClientIp%3E%3CTrackID%20ID=%22{}%22/%3E%3C/TrackFieldRequest%3E"
+    usps_username = os.environ.get("USPS_USERID")
+    request_url = "http://production.shippingapis.com/ShippingAPI.dll?API=TrackV2&XML="
+    request_xml = urllib.parse.quote(
+        f"""<TrackFieldRequest USERID="{usps_username}">
+                    <ClientIp>111.0.0.1</ClientIp>
+                    <TrackID ID="{track}" />
+                    </TrackFieldRequest>"""
     )
-    r = ElementTree.fromstring(requests.get(usps.format(str(track))).content)
+    usps = request_url + request_xml
+    r = ElementTree.fromstring(requests.get(usps).content)
     return r
 
 
@@ -50,4 +55,4 @@ df["Status"] = status_list
 df["Status Date"] = date_list
 df["Delivery Attribute Code"] = code_list
 
-df.to_csv("results_tuesday.csv")
+df.to_csv("results.csv")
