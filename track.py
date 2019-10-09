@@ -23,7 +23,7 @@ def divide_chunks(l, chunk_size):
 
 
 # set limit of asyncrohous request here
-chunk_size = 10  
+chunk_size = 10
 
 # set minimum seconds between batch request here
 throttle = 1
@@ -85,12 +85,4 @@ for list in tqdm(lists):
 df = pd.DataFrame(list_track)
 df["status"] = list_status
 df["date"] = list_date
-
-
-# stop timer and print time
-times = []
-elapsed = time.perf_counter() - start
-times.append(f"executed in {elapsed:0.2f} seconds.")
-print(times)
-
 df.to_csv("sample_list_response.csv")
