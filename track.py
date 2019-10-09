@@ -1,58 +1,84 @@
+import csv
 import pandas as pd
-import requests
+import aiohttp
+import asyncio
+import time
 from xml.etree import ElementTree
-from tqdm import tqdm
 import urllib.parse
 import os
+from tqdm import tqdm
 
 
-def no(track):
-    usps_username = os.environ.get("USPS_USERID")
-    request_url = "http://production.shippingapis.com/ShippingAPI.dll?API=TrackV2&XML="
-    request_xml = urllib.parse.quote(
-        f"""<TrackFieldRequest USERID="{usps_username}">
-                    <ClientIp>111.0.0.1</ClientIp>
-                    <TrackID ID="{track}" />
-                    </TrackFieldRequest>"""
-    )
-    usps = request_url + request_xml
-    r = ElementTree.fromstring(requests.get(usps).content)
-    return r
+# open tracking list from csv file and create list of items
+my_list = []
+with open("sample_list.csv", newline="") as inputfile:
+    next(inputfile)
+    for row in csv.reader(inputfile):
+        my_list.append(row[0])
 
 
-# read in USPS USERID from os environment variable
+def divide_chunks(l, n):
+    for i in range(0, len(l), n):
+        yield l[i : i + n]
+
+
+# set limit of asyncrohous request here
+n = 10
+
 usps_username = os.environ.get("USPS_USERID")
+usps_link = "http://production.shippingapis.com/ShippingAPI.dll?API=TrackV2&XML="
+usps_data = """<TrackFieldRequest USERID="{usps_username}">
+                <ClientIp>111.0.0.1</ClientIp>
+                <TrackID ID="{track}" />
+                </TrackFieldRequest>""".replace(
+    "{usps_username}", usps_username
+)
 
-# read in list of tracking numbers to be processed
-data = pd.read_csv("sample_mix.csv")
+list_track = []
+list_status = []
+list_date = []
 
-df = pd.DataFrame(data=data)
+lists = list(divide_chunks(my_list, n))
 
-status_list = []
-date_list = []
-code_list = []
+start = time.perf_counter()  # start timer
+
+for list in tqdm(lists):
+
+    async def main():
+        async with aiohttp.ClientSession() as session:
+            await asyncio.gather(*(_get_response(session, trackno) for trackno in list))
+
+    async def _get_response(session, trackno):
+        async with session.get(
+            usps_link + urllib.parse.quote(usps_data.replace("{track}", trackno))
+        ) as resp:
+            r = await resp.text()
+            r = ElementTree.fromstring(r)
+
+            list_track.append(trackno)
+
+            event = r.findall("TrackInfo/TrackSummary/Event")
+            for e in event:
+                event = e.text
+            list_status.append(event)
+
+            eventdate = r.findall("TrackInfo/TrackSummary/EventDate")
+            for e in eventdate:
+                eventdate = e.text
+            list_date.append(eventdate)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
+
+df = pd.DataFrame(list_track)
+df["status"] = list_status
+df["date"] = list_date
 
 
-for track in tqdm(df["TrackingNumber"]):
-    r = no(track)
+# stop timer and print time
+times = []
+elapsed = time.perf_counter() - start
+times.append(f"executed in {elapsed:0.2f} seconds.")
+print(times)
 
-    event = r.findall("TrackInfo/TrackSummary/Event")
-    for e in event:
-        event = e.text
-    status_list.append(event)
-
-    eventdate = r.findall("TrackInfo/TrackSummary/EventDate")
-    for e in eventdate:
-        eventdate = e.text
-    date_list.append(eventdate)
-
-    code = r.findall("TrackInfo/TrackSummary/DeliveryAttributeCode")
-    for e in code:
-        code = e.text
-    code_list.append(code)
-
-df["Status"] = status_list
-df["Status Date"] = date_list
-df["Delivery Attribute Code"] = code_list
-
-df.to_csv("results.csv")
+df.to_csv("sample_list_response.csv")
