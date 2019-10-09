@@ -17,13 +17,13 @@ with open("sample_mix.csv", newline="") as inputfile:
         my_list.append(row[0])
 
 
-def divide_chunks(l, n):
-    for i in range(0, len(l), n):
-        yield l[i : i + n]
+def divide_chunks(l, chunk_size):
+    for i in range(0, len(l), chunk_size):
+        yield l[i : i + chunk_size]
 
 
 # set limit of asyncrohous request here
-n = 10  # rename to "batch" later on
+chunk_size = 10  
 
 # set minimum seconds between batch request here
 throttle = 1
@@ -42,7 +42,7 @@ list_track = []
 list_status = []
 list_date = []
 
-lists = list(divide_chunks(my_list, n))
+lists = list(divide_chunks(my_list, chunk_size))
 
 for list in tqdm(lists):
     start = time.perf_counter()  # start timer
