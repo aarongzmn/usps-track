@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 # open tracking list from csv file and create list of items
 my_list = []
-with open("sample_list.csv", newline="") as inputfile:
+with open("sample_mix.csv", newline="") as inputfile:
     next(inputfile)
     for row in csv.reader(inputfile):
         my_list.append(row[0])
@@ -23,7 +23,11 @@ def divide_chunks(l, n):
 
 
 # set limit of asyncrohous request here
-n = 10
+n = 10  # rename to "batch" later on
+
+# set minimum seconds between batch request here
+throttle = 1
+
 
 usps_username = os.environ.get("USPS_USERID")
 usps_link = "http://production.shippingapis.com/ShippingAPI.dll?API=TrackV2&XML="
@@ -40,9 +44,8 @@ list_date = []
 
 lists = list(divide_chunks(my_list, n))
 
-start = time.perf_counter()  # start timer
-
 for list in tqdm(lists):
+    start = time.perf_counter()  # start timer
 
     async def main():
         async with aiohttp.ClientSession() as session:
@@ -69,6 +72,15 @@ for list in tqdm(lists):
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
+
+    elapsed = time.perf_counter() - start  # stop timer
+    if elapsed > throttle:  # set minimum amount of seconds per request batch here
+        pass
+    else:
+        time.sleep(
+            throttle - elapsed
+        )  # used to make sure there is always at least 1 second per n number of requests
+
 
 df = pd.DataFrame(list_track)
 df["status"] = list_status
